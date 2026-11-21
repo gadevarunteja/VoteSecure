@@ -1,0 +1,226 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Candidates Standings - VoteSecure</title>
+    <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+    <header>
+        <div class="nav-container">
+            <a href="home.html" class="logo-area">
+                🗳️ <span>VoteSecure</span>
+            </a>
+            <ul class="nav-menu">
+                <li><a href="home.html" class="nav-link">Home</a></li>
+                <li><a href="dashboard.html" class="nav-link active">Dashboard</a></li>
+                <li><a href="profile.html" class="nav-link">Profile</a></li>
+                <li><a href="#" onclick="performLogout()" class="nav-link">Logout</a></li>
+            </ul>
+        </div>
+    </header>
+
+    <main class="container">
+        <!-- Back Button -->
+        <a href="dashboard.html" class="btn btn-secondary btn-sm" style="margin-bottom: 2rem;">← Back to Dashboard</a>
+
+        <!-- Election Profile Card -->
+        <div class="glass-card animate-fade-in" style="margin-bottom: 2.5rem;" id="election-details-card">
+            <h1 id="election-title" style="font-size: 1.8rem; font-weight: 800;">Loading Election...</h1>
+            <p id="election-desc" style="color: var(--text-secondary); margin-top: 0.5rem; max-width: 800px;">Please wait while the election details are being fetched.</p>
+            <div style="display: flex; gap: 1rem; margin-top: 1.5rem; flex-wrap: wrap;" id="election-meta-stats">
+                <!-- Metadata items -->
+            </div>
+        </div>
+
+        <div style="margin-bottom: 2rem;">
+            <h2>Select Candidate to Vote</h2>
+            <p style="color: var(--text-secondary); font-size: 0.95rem; margin-top: 0.25rem;">Ensure you review manifestos before casting your decisive vote.</p>
+        </div>
+
+        <!-- Candidates Grid -->
+        <div id="candidates-container" class="candidates-grid">
+            <!-- Dynamic loading -->
+            <div class="glass-card empty-state" style="grid-column: 1 / -1;">
+                <div class="empty-icon">⏳</div>
+                <p>Loading candidate list...</p>
+            </div>
+        </div>
+    </main>
+
+    <!-- Vote Confirmation Modal -->
+    <div id="vote-modal" class="modal-backdrop" onclick="closeVoteModal(event)">
+        <div class="glass-panel modal-content" style="max-width: 450px; text-align: center;" onclick="event.stopPropagation()">
+            <div style="font-size: 3rem; margin-bottom: 1rem;">🛡️</div>
+            <h2 style="font-weight: 800; margin-bottom: 0.5rem;">Cast Your Vote?</h2>
+            <p style="color: var(--text-secondary); margin-bottom: 1.5rem; line-height: 1.4;">
+                You are about to cast your vote for <strong id="confirm-candidate-name">Candidate</strong> (<span id="confirm-candidate-party">Party</span>). 
+                <br><span style="color: var(--danger-color); font-size: 0.85rem; font-weight: 600;">This action cannot be undone.</span>
+            </p>
+            <div style="display: flex; gap: 1rem; justify-content: center;">
+                <button class="btn btn-secondary" onclick="hideVoteModal()">Cancel</button>
+                <button class="btn btn-success" id="confirm-vote-btn" onclick="submitVote()">Confirm Vote</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="js/app.js"></script>
+    <script>
+        let electionId = 0;
+        let candidatesData = [];
+        let votedStatus = false;
+        let votedCandidateId = null;
+        let targetCandidateId = null;
+
+        document.addEventListener('DOMContentLoaded', async () => {
+            const user = await checkAuth('voter');
+            if (!user) return;
+
+            const urlParams = new URLSearchParams(window.location.search);
+            electionId = parseInt(urlParams.get('election_id') || 0);
+
+            if (electionId <= 0) {
+                showToast('Invalid Election Target.', 'error');
+                setTimeout(() => { window.location.href = 'dashboard.html'; }, 1000);
+                return;
+            }
+
+            // Load verification status and details
+            await checkVotingStatus();
+            await loadCandidates();
+        });
+
+        async function checkVotingStatus() {
+            const result = await API.get(`api/vote/status.php?election_id=${electionId}`);
+            if (result.success) {
+                votedStatus = result.voted;
+                if (result.voted) {
+                    votedCandidateId = parseInt(result.vote.candidate_id);
+                }
+            }
+        }
+
+        async function loadCandidates() {
+            const data = await API.get(`api/candidates/index.php?election_id=${electionId}`);
+            if (!data.success) {
+                showToast(data.message, 'error');
+                return;
+            }
+
+            const election = data.election;
+            candidatesData = data.candidates;
+
+            // Render election header
+            document.getElementById('election-title').innerText = election.title;
+            document.getElementById('election-desc').innerText = election.description;
+
+            const metaContainer = document.getElementById('election-meta-stats');
+            const startStr = formatDateTimeStr(election.start_date, election.start_time);
+            const endStr = formatDateTimeStr(election.end_date, election.end_time);
+            let badgeClass = 'badge-upcoming';
+            if (election.status === 'Active') badgeClass = 'badge-active';
+            if (election.status === 'Completed') badgeClass = 'badge-completed';
+
+            metaContainer.innerHTML = `
+                <span class="badge ${badgeClass}">${election.status}</span>
+                <span style="font-size: 0.9rem; color: var(--text-secondary);">⏰ Starts: <strong>${startStr}</strong></span>
+                <span style="font-size: 0.9rem; color: var(--text-secondary);">⏰ Ends: <strong>${endStr}</strong></span>
+            `;
+
+            // Render candidates list
+            const container = document.getElementById('candidates-container');
+            container.innerHTML = '';
+
+            if (candidatesData.length === 0) {
+                container.innerHTML = `
+                    <div class="glass-card empty-state" style="grid-column: 1 / -1;">
+                        <div class="empty-icon">👥</div>
+                        <h3>No Candidates Registered</h3>
+                        <p>No candidates have been added to this election yet.</p>
+                    </div>
+                `;
+                return;
+            }
+
+            candidatesData.forEach(cand => {
+                const photoSrc = cand.photo ? cand.photo : 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=150&q=80'; // fallback
+                const card = document.createElement('div');
+                card.className = 'glass-card candidate-card animate-fade-in';
+
+                let actionButton = '';
+                if (election.status !== 'Active') {
+                    actionButton = `<button class="btn btn-secondary btn-sm" disabled style="opacity: 0.5; width: 100%;">Voting Closed</button>`;
+                } else if (votedStatus) {
+                    if (votedCandidateId === parseInt(cand.id)) {
+                        actionButton = `<button class="btn btn-success btn-sm" disabled style="width: 100%; box-shadow: none;">⭐️ Voted (Your Choice)</button>`;
+                    } else {
+                        actionButton = `<button class="btn btn-secondary btn-sm" disabled style="opacity: 0.5; width: 100%;">Booth Closed</button>`;
+                    }
+                } else {
+                    actionButton = `<button class="btn btn-primary btn-sm" style="width: 100%;" onclick="confirmVote(${cand.id}, '${cand.name}', '${cand.party}')">Vote for ${cand.name}</button>`;
+                }
+
+                card.innerHTML = `
+                    <img src="${photoSrc}" alt="${cand.name}" class="candidate-avatar">
+                    <h3 class="candidate-name">${cand.name}</h3>
+                    <p class="candidate-party">${cand.party}</p>
+                    <p class="candidate-manifesto" title="${cand.manifesto}">${cand.manifesto}</p>
+                    <div style="width: 100%; border-top: 1px solid rgba(255,255,255,0.05); padding-top: 1rem; margin-top: auto;">
+                        ${actionButton}
+                    </div>
+                `;
+                container.appendChild(card);
+            });
+        }
+
+        function confirmVote(candidateId, candidateName, candidateParty) {
+            targetCandidateId = candidateId;
+            document.getElementById('confirm-candidate-name').innerText = candidateName;
+            document.getElementById('confirm-candidate-party').innerText = candidateParty;
+            
+            const modal = document.getElementById('vote-modal');
+            modal.classList.add('show');
+        }
+
+        function hideVoteModal() {
+            const modal = document.getElementById('vote-modal');
+            modal.classList.remove('show');
+            targetCandidateId = null;
+        }
+
+        function closeVoteModal(event) {
+            if (event.target.id === 'vote-modal') {
+                hideVoteModal();
+            }
+        }
+
+        async function submitVote() {
+            if (!targetCandidateId) return;
+
+            const btn = document.getElementById('confirm-vote-btn');
+            btn.disabled = true;
+            btn.innerText = 'Casting...';
+
+            const formData = new FormData();
+            formData.append('election_id', electionId);
+            formData.append('candidate_id', targetCandidateId);
+
+            const result = await API.post('api/vote/index.php', formData);
+
+            if (result.success) {
+                showToast(result.message, 'success');
+                hideVoteModal();
+                // Reload to update UI states
+                setTimeout(() => {
+                    window.location.href = 'dashboard.html';
+                }, 1500);
+            } else {
+                showToast(result.message, 'error');
+                btn.disabled = false;
+                btn.innerText = 'Confirm Vote';
+            }
+        }
+    </script>
+</body>
+</html>

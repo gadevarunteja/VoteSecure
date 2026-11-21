@@ -1,0 +1,121 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Voter Registration - VoteSecure</title>
+    <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+    <header>
+        <div class="nav-container">
+            <a href="home.html" class="logo-area">
+                🗳️ <span>VoteSecure</span>
+            </a>
+            <ul class="nav-menu">
+                <li><a href="home.html" class="nav-link">Home</a></li>
+                <li><a href="login.html" class="nav-link">Login</a></li>
+                <li><a href="register.html" class="nav-link active">Register</a></li>
+            </ul>
+        </div>
+    </header>
+
+    <div class="auth-wrapper animate-fade-in" style="max-width: 600px; margin: 3rem auto;">
+        <div class="glass-panel">
+            <div class="auth-header">
+                <h1>Voter Registration</h1>
+                <p>Register to participate in upcoming digital elections</p>
+            </div>
+
+            <form id="register-form">
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
+                    <div class="form-group">
+                        <label for="name">Full Name</label>
+                        <input type="text" id="name" name="name" class="input-control" placeholder="Enter Full Name" required>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="voter_id">Voter ID Card Number</label>
+                        <input type="text" id="voter_id" name="voter_id" class="input-control" placeholder="E.g., EPIC12345" required>
+                    </div>
+                </div>
+
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
+                    <div class="form-group">
+                        <label for="email">Email Address</label>
+                        <input type="email" id="email" name="email" class="input-control" placeholder="name@domain.com" required>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="mobile">Mobile Number</label>
+                        <input type="tel" id="mobile" name="mobile" class="input-control" placeholder="E.g., 9876543210" pattern="[0-9]{10}" title="Ten digit mobile number" required>
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label for="dob">Date of Birth</label>
+                    <input type="date" id="dob" name="dob" class="input-control" required>
+                </div>
+
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
+                    <div class="form-group">
+                        <label for="password">Password</label>
+                        <input type="password" id="password" name="password" class="input-control" placeholder="••••••••" required>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="confirm_password">Confirm Password</label>
+                        <input type="password" id="confirm_password" name="confirm_password" class="input-control" placeholder="••••••••" required>
+                    </div>
+                </div>
+
+                <button type="submit" class="btn btn-primary" style="width: 100%; margin-top: 1rem;">Register Account</button>
+            </form>
+
+            <div style="text-align: center; margin-top: 1.5rem; font-size: 0.9rem; color: var(--text-secondary);">
+                Already have a voter account? <a href="login.html" style="color: var(--primary-color); text-decoration: none; font-weight: 600;">Login here</a>
+            </div>
+        </div>
+    </div>
+
+    <script src="js/app.js"></script>
+    <script>
+        document.addEventListener('DOMContentLoaded', async () => {
+            // Check auth to redirect if already logged in
+            await checkAuth();
+
+            // Set max date for birth input (must be at least 18 years old)
+            const dobInput = document.getElementById('dob');
+            const eighteenYearsAgo = new Date();
+            eighteenYearsAgo.setFullYear(eighteenYearsAgo.getFullYear() - 18);
+            dobInput.max = eighteenYearsAgo.toISOString().split('T')[0];
+        });
+
+        document.getElementById('register-form').addEventListener('submit', async (e) => {
+            e.preventDefault();
+
+            const form = e.target;
+            const password = document.getElementById('password').value;
+            const confirm = document.getElementById('confirm_password').value;
+
+            if (password !== confirm) {
+                showToast('Passwords do not match.', 'error');
+                return;
+            }
+
+            const formData = new FormData(form);
+            const result = await API.post('api/auth/register.php', formData);
+
+            if (result.success) {
+                showToast(result.message, 'success');
+                form.reset();
+                setTimeout(() => {
+                    window.location.href = 'login.html';
+                }, 2000);
+            } else {
+                showToast(result.message, 'error');
+            }
+        });
+    </script>
+</body>
+</html>

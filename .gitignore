@@ -1,0 +1,35 @@
+﻿# Environment and secrets
+.env
+.env.*
+!.env.example
+
+# Uploaded candidate photos
+api/uploads/*
+!api/uploads/.gitkeep
+
+# Logs
+*.log
+logs/
+
+# Temporary files
+*.tmp
+*.temp
+
+# Operating system files
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# IDE files
+.vscode/
+.idea/
+
+# Dependencies
+vendor/
+node_modules/
+
+# Test-generated files
+*.cookie
+
+# Sample candidate image
+mock_candidate.png
